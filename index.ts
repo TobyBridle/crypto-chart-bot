@@ -1,15 +1,7 @@
 import chalk from "chalk";
 import { Client, Events, GatewayIntentBits } from "discord.js";
 import { configDotenv } from "dotenv";
-import _logger from "pino";
-const logger = _logger({
-  transport: {
-    target: "pino-pretty",
-    options: {
-      colorize: true,
-    },
-  },
-});
+import logger from "./logger";
 configDotenv();
 
 if (process.env.BOT_TOKEN == undefined) {
