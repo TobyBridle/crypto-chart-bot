@@ -11,6 +11,7 @@ import { configDotenv } from "dotenv";
 import logger from "./logger";
 configDotenv();
 import cmds, { commands, commandNames } from "commands";
+import { isAsyncFunction } from "util/types";
 
 if (process.env.BOT_TOKEN == undefined) {
   logger.error(chalk.red.bold("BOT_TOKEN was not found in the environment!"));
@@ -42,7 +43,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
     const callback = Array.from(commands.entries()).find(
       (cmd) => cmd[0].name === interaction.commandName,
     )!![1];
-    const ret = callback(interaction.options.data);
+    let ret;
+    if (isAsyncFunction(callback)) {
+      ret = await callback(interaction.options.data);
+    } else {
+      ret = callback(interaction.options.data);
+    }
     await interaction.reply(
       ret != undefined
         ? `${ret}`
