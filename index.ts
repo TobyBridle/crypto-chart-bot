@@ -51,7 +51,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
     }
     await interaction.reply(
       ret != undefined
-        ? `${ret}`
+        ? ret?.embeds
+          ? (ret as { embeds: [EmbedBuilder] })
+          : `${ret}`
         : (() => {
             const embedBuilder = new EmbedBuilder()
               .setColor(0xaeffa0)
