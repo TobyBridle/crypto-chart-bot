@@ -12,87 +12,8 @@ import { ChartJSNodeCanvas } from "chartjs-node-canvas";
 
 import logger from "../logger";
 import chalk, { Chalk } from "chalk";
-
-class Singleton {
-  static #instance: Singleton;
-  client: RestClientV5;
-  ctx: ChartJSNodeCanvas;
-
-  /**
-   * The Singleton's constructor should always be private to prevent direct
-   * construction calls with the `new` operator.
-   */
-  private constructor() {
-    this.client = new RestClientV5({
-      testnet: false,
-      key: process.env.CLIENT_KEY,
-      secret: process.env.CLIENT_SECRET,
-    });
-
-    this.ctx = new ChartJSNodeCanvas({
-      width: 1600,
-      height: 900,
-      plugins: {
-        globalVariableLegacy: [
-          "chartjs-adapter-date-fns",
-          "chartjs-chart-financial",
-        ],
-      },
-      chartCallback: () => {
-        global.window = global.window || {};
-      },
-      backgroundColour: "#161A25",
-    });
-  }
-
-  /**
-   * The static getter that controls access to the singleton instance.
-   *
-   * This implementation allows you to extend the Singleton class while
-   * keeping just one instance of each subclass around.
-   */
-  public static get instance(): Singleton {
-    if (!Singleton.#instance) {
-      Singleton.#instance = new Singleton();
-    }
-
-    return Singleton.#instance;
-  }
-
-  async scrape(
-    symbol: string,
-    timeframe: KlineIntervalV3 = "60",
-    marketType: "spot" | "linear" | "inverse" = "linear",
-  ) {
-    const args = {
-      category: marketType,
-      symbol: symbol,
-      interval: timeframe,
-      limit: 100,
-    };
-    console.log(args);
-    const res = await this.client.getKline(args);
-    if (res.retCode != 0 || !res.result.list.length) {
-      const reason =
-        res?.retMsg ||
-        "Data does not exist. Check the symbol naming, timeframe and market type.";
-      console.error(`Could not fetch data for ${symbol}. Reason: ${reason}`);
-      throw new Error(reason);
-    }
-    return {
-      args: args,
-      data: res.result.list
-        .map((entry) => ({
-          x: parseInt(entry[0], 10),
-          o: parseFloat(entry[1]),
-          h: parseFloat(entry[2]),
-          l: parseFloat(entry[3]),
-          c: parseFloat(entry[4]),
-        }))
-        .reverse(),
-    };
-  }
-}
+import Singleton from "./chart/singleton";
+import chartBuilder from "./chart/chartBuilder";
 
 const data = new SlashCommandBuilder()
   .setName("c")
@@ -198,69 +119,7 @@ export async function task(
     };
   }
 
-  const scaleDefaults = {
-    ticks: {
-      font: {
-        size: 18,
-      },
-    },
-    grid: { display: true, color: "#222630" },
-  };
-  const image = await client.ctx.renderToBuffer(
-    {
-      // @ts-ignore
-      type: "candlestick"!!,
-      data: {
-        datasets: [
-          {
-            label: "Price of " + parsedArgs.symbol,
-            // @ts-ignore
-            data: res,
-            color: {
-              up: "#4CAF50",
-              down: "#FF5252",
-              unchanged: "#9E9E9E",
-            },
-            borderColor: {
-              // @ts-ignore
-              up: "#4CAF50",
-              down: "#FF5252",
-              unchanged: "#9E9E9E",
-            },
-            wickColor: {
-              up: "#4CAF50",
-              down: "#FF5252",
-              unchanged: "#9E9E9E",
-            },
-          },
-        ],
-      },
-      options: {
-        scales: {
-          y: {
-            ...scaleDefaults,
-            position: "right",
-          },
-          x: { ...scaleDefaults },
-        },
-        plugins: {
-          legend: {
-            display: false,
-          },
-          title: {
-            display: true,
-            text: `BYBIT ${parsedArgs.category[0].toUpperCase()}${parsedArgs.category.slice(1)} - ${parsedArgs.symbol} · ${parsedArgs.interval}`,
-            font: { size: 36, weight: "bold" },
-            padding: { top: 20, bottom: 20 },
-            align: "start",
-            position: "top",
-            color: "white",
-          },
-        },
-      },
-    },
-    "image/png",
-  );
+  const image = await chartBuilder(client, parsedArgs, res);
 
   const attachment = new AttachmentBuilder(image, { name: "image.png" });
   return {
